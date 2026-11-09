@@ -48,11 +48,17 @@ These are the costs this design targets. They are the general costs any payment 
 
 ## 4. How it works
 
-├── terraform/              # all infrastructure as code
-│   ├── main.tf, api.tf, dynamodb.tf, lambdas.tf
-│   ├── phase2.tf           # queues, extra Lambdas, routes, secret, reconciler schedule
-│   ├── demo.tf             # serves the demo page
-│   └── modules/lambda_function/
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING
+    PENDING --> PAID: payment confirmed
+    PENDING --> FAILED: payment never completed
+    PAID --> TOKEN_ISSUED: token delivered (exactly once)
+    PAID --> FAILED: delivery failed after retries
+    FAILED --> REFUNDED: automatic refund
+    TOKEN_ISSUED --> [*]
+    REFUNDED --> [*]
+```
 
 
 ### The order lifecycle
