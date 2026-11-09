@@ -48,12 +48,12 @@ These are the costs this design targets. They are the general costs any payment 
 
 ## 4. How it works
 
-```├── terraform/              # all infrastructure as code
+├── terraform/              # all infrastructure as code
 │   ├── main.tf, api.tf, dynamodb.tf, lambdas.tf
 │   ├── phase2.tf           # queues, extra Lambdas, routes, secret, reconciler schedule
 │   ├── demo.tf             # serves the demo page
 │   └── modules/lambda_function/
-```
+
 
 ### The order lifecycle
 
