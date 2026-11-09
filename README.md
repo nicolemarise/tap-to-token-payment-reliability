@@ -48,21 +48,11 @@ These are the costs this design targets. They are the general costs any payment 
 
 ## 4. How it works
 
-```mermaid
-flowchart LR
-    C[Customer] -->|1. Create order| API[API Gateway]
-    API --> L1[Create-order Lambda]
-    L1 --> DB[(DynamoDB<br/>orders + idempotency)]
-    GW[Mock payment gateway<br/>with chaos switch] -->|2. Payment callback<br/>may be duplicate, late, or lost| CB[Callback Lambda]
-    CB --> DB
-    CB -->|3. Paid order| Q[SQS delivery queue]
-    Q --> W[Worker Lambda]
-    W -->|4. Request token| UP[Mock utility provider<br/>randomly times out]
-    W --> DB
-    Q -.->|after retries fail| DLQ[Dead-letter queue]
-    R[Reconciliation Lambda<br/>runs on a schedule] -->|5. Find stuck orders, ask gateway for status| DB
-    R --> GW
-    DB --> CW[CloudWatch dashboard + alarms]
+```├── terraform/              # all infrastructure as code
+│   ├── main.tf, api.tf, dynamodb.tf, lambdas.tf
+│   ├── phase2.tf           # queues, extra Lambdas, routes, secret, reconciler schedule
+│   ├── demo.tf             # serves the demo page
+│   └── modules/lambda_function/
 ```
 
 ### The order lifecycle
