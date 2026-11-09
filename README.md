@@ -98,6 +98,7 @@ The demo page lets you pick a way for the purchase to go wrong, then shows the a
 - The supplier times out
 
 The demo video above walks through the main ones. The endpoints are public while the stack is deployed, so I share the live link on request.
+I tear the stack down to avoid ongoing cost, so there is no live link. I can rebuild it with terraform apply to show it live.
 
 ## 5. The chaos switch
 
@@ -122,6 +123,7 @@ The tests run locally against a fake AWS, so they need no account and cost nothi
 - invalid state changes being refused
 - callbacks with a bad signature or the wrong amount being rejected
 - an unreachable or confusing supplier never causing a refund (the system waits until it knows what happened)
+- callbacks with a bad signature or the wrong amount being rejected, and an unreachable or confusing supplier never causing a refund (the system waits until it knows what happened)
 
 Run them with `python -m pytest tests/ -q`. I also ran scenarios against the deployed system, shown in the demo video.
 
@@ -143,6 +145,8 @@ Everything is defined as code with Terraform, so controls are consistent and rev
 - I destroy the stack when I am not demonstrating it, and `terraform apply` rebuilds it
 
 I did not measure cost per transaction. That would be the next step.
+
+I destroyed the stack after recording the demo, and terraform apply rebuilds it
 
 ## 9. Tech stack
 
