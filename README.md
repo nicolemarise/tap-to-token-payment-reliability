@@ -163,23 +163,23 @@ Payments are high-volume and low-value, so small inefficiencies add up.
 ```
 tap-to-token/
 ├── README.md
-├── terraform/            # all infrastructure as code
-│   ├── dynamodb.tf
-│   ├── api.tf
-│   ├── queue.tf
-│   ├── lambdas.tf
-│   ├── monitoring.tf
-│   └── budget.tf
+├── terraform/              # all infrastructure as code
+│   ├── main.tf, api.tf, dynamodb.tf, lambdas.tf
+│   ├── phase2.tf           # queues, extra Lambdas, routes, secret, reconciler schedule
+│   └── modules/lambda_function/
 ├── src/
-│   ├── create_order/
-│   ├── callback_handler/
-│   ├── delivery_worker/
-│   ├── reconciler/
-│   ├── mock_gateway/     # includes the chaos switch
-│   └── mock_utility/
-├── naive/                # the comparison version
-├── loadtest/             # k6 scripts
-└── docs/                 # architecture diagram, screenshots, demo video
+│   ├── layer/python/ttt/   # shared state machine, audit log and helpers
+│   ├── create_order/       # POST /orders (idempotency key)
+│   ├── get_order/          # GET /orders/{id}: order + audit log
+│   ├── callback_receiver/  # payment "result URL": signature check, dedupe, PENDING -> PAID
+│   ├── delivery_worker/    # asks the supplier for the token
+│   ├── reconciler/         # finds stuck orders, asks the supplier, delivers or refunds
+│   ├── mock_gateway/       # simulated gateway with the chaos switch
+│   ├── callback_sender/    # simulated gateway sending signed callbacks
+│   ├── mock_utility/       # simulated electricity supplier (idempotent by reference)
+│   └── demo_page/          # the clickable demo page
+├── tests/                  # local tests (no AWS account needed)
+└── docs/                   # screenshots
 ```
 
 ## 12. Running it
