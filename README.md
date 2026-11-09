@@ -1,5 +1,7 @@
 # tap-to-token-payment-reliability
 Resilient payment-to-delivery pipeline on AWS: guarantees a paid ZESA token order ends in exactly one token or a refund. Built with Terraform, Lambda, DynamoDB and SQS. Simulation project.
+video link: https://youtu.be/_fXECni6K5E
+
 # Tap to Token
 
 **A resilient payment-to-delivery pipeline, built around one painful moment: a customer pays for a ZESA token and nothing arrives.**
@@ -209,4 +211,11 @@ terraform destroy
 - Add edge protection (WAF and rate limiting) and test against real month-end traffic patterns
 - Add Cost Anomaly Detection and per-provider cost and failure tracking
 - Add per-provider success-rate monitoring, so a struggling payment method is visible immediately
+
+##proof
+<img width="1365" height="767" alt="Screenshot 2026-11-09 012239" src="https://github.com/user-attachments/assets/74545573-b982-4b16-a1b9-42d5eb5082a2" />
+<img width="1365" height="767" alt="Screenshot 2026-11-09 004625" src="https://github.com/user-attachments/assets/65b29ad9-d5ad-451b-90e1-f389fbb8787a" />
+<img width="1365" height="767" alt="Screenshot 2026-11-09 102749" src="https://github.com/user-attachments/assets/c1c21a63-37ae-44de-96d4-56b8bb430849" />
+<img width="1365" height="767" alt="Screenshot 2026-11-09 102731" src="https://github.com/user-attachments/assets/2709d8c5-e544-46a5-b5c2-4476520fe21d" />
+<img width="1360" height="767" alt="Screenshot 2026-11-09 111446" src="https://github.com/user-attachments/assets/a463a528-5e89-4858-b698-ebf33273b871" />
 
