@@ -162,6 +162,7 @@ tap-to-token/
 ├── terraform/              # all infrastructure as code
 │   ├── main.tf, api.tf, dynamodb.tf, lambdas.tf
 │   ├── phase2.tf           # queues, extra Lambdas, routes, secret, reconciler schedule
+│   ├── demo.tf             # serves the demo page
 │   └── modules/lambda_function/
 ├── src/
 │   ├── layer/python/ttt/   # shared state machine, audit log and helpers
