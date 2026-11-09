@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tap to Token: a ZESA token payment that survives failure</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --text: #1b2430; --muted: #5b6675; --line: #dfe3e8;
+    --accent: #0b6e4f; --accent-text: #ffffff; --ok: #0b6e4f; --warn: #9a5b00; --bad: #b3261e;
+    --chip: #eef1f4; --code: #f0f3f6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12161b; --card: #1a2027; --text: #e8ecf0; --muted: #9aa6b2; --line: #2b333c;
+      --accent: #3fbf93; --accent-text: #08231a; --ok: #3fbf93; --warn: #e0a64a; --bad: #f08a82;
+      --chip: #232b34; --code: #232b34;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 28px 18px 60px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; }
+  h2 { font-size: 1.1rem; margin: 0 0 12px; }
+  .lede { color: var(--muted); margin: 0 0 6px; }
+  .badge { display: inline-block; font-size: .8rem; padding: 2px 10px; border-radius: 99px;
+           background: var(--chip); color: var(--muted); margin-bottom: 18px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+          padding: 18px; margin-bottom: 16px; }
+  label { display: block; font-weight: 600; font-size: .9rem; margin-bottom: 4px; }
+  input, select { width: 100%; padding: 10px; font: inherit; color: var(--text);
+                  background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+  @media (max-width: 520px) { .row { grid-template-columns: 1fr; } }
+  .scenarios { display: grid; gap: 8px; margin: 8px 0 16px; padding: 0; border: 0; }
+  .scenario { display: flex; gap: 10px; padding: 10px 12px; border: 1px solid var(--line);
+              border-radius: 8px; cursor: pointer; align-items: flex-start; }
+  .scenario:has(input:checked) { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .scenario input { width: auto; margin-top: 5px; }
+  .scenario b { display: block; font-weight: 600; }
+  .scenario span { color: var(--muted); font-size: .9rem; }
+  button { font: inherit; font-weight: 600; padding: 12px 20px; border: 0; border-radius: 8px;
+           background: var(--accent); color: var(--accent-text); cursor: pointer; width: 100%; }
+  button:disabled { opacity: .55; cursor: not-allowed; }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .status { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .chip { padding: 3px 12px; border-radius: 99px; font-weight: 600; background: var(--chip); }
+  .chip.ok { color: var(--ok); } .chip.warn { color: var(--warn); } .chip.bad { color: var(--bad); }
+  .small { color: var(--muted); font-size: .85rem; }
+  ol.timeline { list-style: none; margin: 12px 0; padding: 0; border-left: 2px solid var(--line); }
+  ol.timeline li { margin: 0 0 12px 14px; padding-left: 4px; position: relative; }
+  ol.timeline li::before { content: ""; position: absolute; left: -22px; top: 8px; width: 10px; height: 10px;
+                           border-radius: 50%; background: var(--accent); }
+  ol.timeline li.you::before { background: var(--muted); }
+  .who { font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .result { margin-top: 12px; padding: 14px; border-radius: 8px; background: var(--code); }
+  .token { font: 700 1.5rem/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .04em;
+           word-break: break-all; }
+  .explain { border-left: 3px solid var(--accent); padding: 4px 12px; margin: 12px 0 0; color: var(--muted); }
+  .err { color: var(--bad); margin: 10px 0 0; }
+  footer { color: var(--muted); font-size: .85rem; margin-top: 24px; }
+  a { color: var(--accent); }
+  @media (prefers-reduced-motion: no-preference) { .chip { transition: color .2s; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Tap to Token</h1>
+  <p class="lede">A customer abroad pays for a ZESA electricity token. Pick a way for it to go wrong,
+    then watch the system still end with exactly one token, or a refund.</p>
+  <p class="badge">Simulation. No real payments, no real customers, not connected to any real company.</p>
+
+  <section class="card" aria-labelledby="buy-title">
+    <h2 id="buy-title">1. The purchase</h2>
+    <div class="row">
+      <div><label for="meter">Meter number</label>
+        <input id="meter" value="01234567890" inputmode="numeric" maxlength="20" autocomplete="off"></div>
+      <div><label for="amount">Amount (USD)</label>
+        <select id="amount"><option value="1000">$10</option><option value="2000">$20</option><option value="5000">$50</option></select></div>
+    </div>
+
+    <h2 id="scenario-title">2. What goes wrong?</h2>
+    <div class="scenarios" id="scenarios" role="radiogroup" aria-labelledby="scenario-title"></div>
+
+    <button id="pay" type="button">Pay now</button>
+    <p class="err" id="error" role="alert" hidden></p>
+  </section>
+
+  <section class="card" id="live" aria-live="polite" hidden>
+    <h2>3. What the system did</h2>
+    <div class="status"><span class="chip" id="chip">Starting</span>
+      <span class="small" id="orderline"></span><span class="small" id="timer"></span></div>
+    <ol class="timeline" id="timeline"></ol>
+    <div class="result" id="result" hidden></div>
+    <p class="explain" id="explain"></p>
+  </section>
+
+  <footer>
+    This runs on AWS (Lambda, DynamoDB, SQS) and is built with Terraform. Every status change is written to an audit log
+    in the same transaction as the change itself, which is what you see above.
+    <a href="https://github.com/nicolemarise/tap-to-token">Source code</a>.
+    The failure switches are shared, so please run one scenario at a time.
+  </footer>
+</main>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+
+const SCENARIOS = [
+  { id: "ok", title: "Everything works", hint: "The happy path, for comparison.",
+    force: "none", timeouts: 0, doubleTap: false,
+    explain: "Nothing goes wrong. The order moves through each step once, and every step is recorded." },
+  { id: "double", title: "The customer taps Pay twice", hint: "Two identical requests arrive.",
+    force: "none", timeouts: 0, doubleTap: true,
+    explain: "Both taps carry the same unique key, so the second one returns the original order instead of creating another. The gateway also refuses to take payment twice for it." },
+  { id: "dup", title: "The gateway confirms the payment twice", hint: "The same confirmation is delivered two times.",
+    force: "duplicate", timeouts: 0, doubleTap: false,
+    explain: "The first confirmation moves the order on. The second is recognised as a duplicate and ignored, so only one token can ever be issued." },
+  { id: "lost", title: "The confirmation is lost", hint: "We never hear that the customer paid.",
+    force: "lost", timeouts: 0, doubleTap: false,
+    explain: "The order sits waiting. A background job (the reconciler) asks the gateway whether this order was paid, learns that it was, and moves it on. Nobody has to step in." },
+  { id: "late", title: "The confirmation arrives late", hint: "It is held back for about 90 seconds.",
+    force: "delayed", timeouts: 0, doubleTap: false,
+    explain: "The reconciler may notice the payment before the late confirmation shows up. Whichever arrives second does no harm." },
+  { id: "timeout", title: "The utility supplier times out", hint: "We cannot tell whether a token was issued.",
+    force: "none", timeouts: 1, doubleTap: false,
+    explain: "The supplier stops answering, so a token may or may not exist. The system retries, then asks the supplier what really happened. It only refunds when the supplier confirms that no token was issued." },
+];
+
+const STATUS_TEXT = {
+  PENDING: ["Waiting for payment confirmation", "warn"],
+  PAID: ["Paid, getting your token", "warn"],
+  TOKEN_ISSUED: ["Token delivered", "ok"],
+  FAILED: ["Delivery failed, refunding", "bad"],
+  REFUNDED: ["Refunded", "bad"],
+};
+const ACTORS = {
+  api: "Order service", "gateway-callback": "Payment confirmation",
+  "delivery-worker": "Delivery worker", reconciler: "Reconciler (safety net)",
+};
+const DONE = new Set(["TOKEN_ISSUED", "REFUNDED"]);
+const POLL_MS = 2000;
+const GIVE_UP_MS = 8 * 60 * 1000;
+
+let run = 0;          // lets a new purchase cancel an older polling loop
+let chaosTouched = false;
+
+function selectedScenario() {
+  const checked = document.querySelector('input[name="scenario"]:checked');
+  return SCENARIOS.find((s) => s.id === checked.value);
+}
+
+function buildScenarios() {
+  const box = $("scenarios");
+  SCENARIOS.forEach((s, i) => {
+    const label = document.createElement("label");
+    label.className = "scenario";
+    const input = document.createElement("input");
+    input.type = "radio"; input.name = "scenario"; input.value = s.id; input.checked = i === 0;
+    const text = document.createElement("div");
+    const title = document.createElement("b"); title.textContent = s.title;
+    const hint = document.createElement("span"); hint.textContent = s.hint;
+    text.append(title, hint);
+    label.append(input, text);
+    box.append(label);
+  });
+}
+
+async function api(method, path, body, headers) {
+  const res = await fetch(path, {
+    method,
+    headers: Object.assign({ "Content-Type": "application/json" }, headers || {}),
+    body: body ? JSON.stringify(body) : undefined,
+    keepalive: method === "PUT",
+  });
+  let data = null;
+  try { data = await res.json(); } catch (e) { /* not JSON */ }
+  if (res.status === 429) throw new Error("The demo is busy. Wait a few seconds and try again.");
+  return { status: res.status, data };
+}
+
+function showError(message) {
+  const el = $("error");
+  el.textContent = message || "";
+  el.hidden = !message;
+}
+
+function newOrderId() {
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  return "web-" + Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function timeText(epochSeconds) {
+  return new Date(Number(epochSeconds) * 1000).toLocaleTimeString();
+}
+
+function addItem(list, who, text, you) {
+  const li = document.createElement("li");
+  if (you) li.className = "you";
+  const w = document.createElement("div"); w.className = "who"; w.textContent = who;
+  const t = document.createElement("div"); t.textContent = text;
+  li.append(w, t);
+  list.append(li);
+}
+
+function render(order, events, youSteps) {
+  const list = $("timeline");
+  list.replaceChildren();
+  youSteps.forEach((text) => addItem(list, "Your browser", text, true));
+  events.forEach((e) => {
+    const who = (ACTORS[e.actor] || e.actor || "System") + (e.timestamp ? " at " + timeText(e.timestamp) : "");
+    const move = e.from_status === "NONE" ? "Order created" : e.from_status + " \u2192 " + e.to_status;
+    const same = e.detail && e.detail.toLowerCase() === move.toLowerCase();
+    addItem(list, who, e.detail && !same ? move + ". " + e.detail : move, false);
+  });
+  const [label, tone] = STATUS_TEXT[order.status] || [order.status, "warn"];
+  const chip = $("chip");
+  chip.textContent = label;
+  chip.className = "chip " + tone;
+}
+
+async function showOutcome(orderId, order) {
+  const box = $("result");
+  box.replaceChildren();
+  box.hidden = false;
+  let supplier = null;
+  try { supplier = (await api("GET", "/utility/status/" + orderId)).data; } catch (e) { /* optional */ }
+  if (order.status === "TOKEN_ISSUED") {
+    const p = document.createElement("div"); p.textContent = "Your ZESA token";
+    const tok = document.createElement("div"); tok.className = "token"; tok.textContent = order.token || "";
+    const note = document.createElement("p"); note.className = "small";
+    note.textContent = supplier && supplier.issued
+      ? "The supplier's records show exactly one token for this order."
+      : "Token delivered.";
+    box.append(p, tok, note);
+  } else {
+    const p = document.createElement("div");
+    p.textContent = "The payment was refunded. No token was issued, so the customer is not charged for nothing.";
+    box.append(p);
+  }
+}
+
+async function setTimeouts(rate) {
+  chaosTouched = true;
+  await api("PUT", "/chaos", { provider_timeout_rate: rate });
+}
+
+async function resetChaos() {
+  if (!chaosTouched) return;
+  chaosTouched = false;
+  try { await api("PUT", "/chaos", { provider_timeout_rate: 0 }); } catch (e) { /* best effort */ }
+}
+
+async function poll(orderId, youSteps, myRun, startedAt) {
+  const timer = $("timer");
+  while (myRun === run) {
+    const elapsed = Math.round((Date.now() - startedAt) / 1000);
+    timer.textContent = "Elapsed: " + elapsed + "s";
+    let res;
+    try { res = await api("GET", "/orders/" + orderId); } catch (e) { res = null; }
+    if (myRun !== run) return;
+    if (res && res.status === 200 && res.data) {
+      render(res.data.order, res.data.events, youSteps);
+      if (DONE.has(res.data.order.status)) {
+        await showOutcome(orderId, res.data.order);
+        await resetChaos();
+        $("pay").disabled = false;
+        return;
+      }
+    }
+    if (Date.now() - startedAt > GIVE_UP_MS) {
+      $("timer").textContent = "Still working. The order is safe; reload this page to keep watching.";
+      await resetChaos();
+      $("pay").disabled = false;
+      return;
+    }
+    await new Promise((r) => setTimeout(r, POLL_MS));
+  }
+}
+
+async function start() {
+  showError("");
+  const meter = $("meter").value.trim();
+  if (!/^[0-9]{6,20}$/.test(meter)) { showError("Enter a meter number of 6 to 20 digits."); return; }
+  const amount = Number($("amount").value);
+  const scenario = selectedScenario();
+
+  $("pay").disabled = true;
+  const myRun = ++run;
+  const orderId = newOrderId();
+  const youSteps = [];
+  $("live").hidden = false;
+  $("result").hidden = true;
+  $("timeline").replaceChildren();
+  $("explain").textContent = scenario.explain;
+  $("orderline").textContent = "Order " + orderId;
+  $("chip").textContent = "Starting";
+  $("chip").className = "chip warn";
+  history.replaceState(null, "", "#" + orderId);
+
+  try {
+    await setTimeouts(scenario.timeouts);
+
+    const create = () => api("POST", "/orders", { meter_number: meter, amount_cents: amount },
+      { "Idempotency-Key": orderId });
+    const first = await create();
+    if (first.status >= 400) throw new Error((first.data && first.data.error) || "Could not create the order.");
+    youSteps.push("Tapped Pay. The order was created.");
+    if (scenario.doubleTap) {
+      const second = await create();
+      youSteps.push(second.data && second.data.idempotent_replay
+        ? "Tapped Pay again. The same order came back, no second order was created."
+        : "Tapped Pay again.");
+    }
+
+    const pay = () => api("POST", "/gateway/pay", { order_id: orderId, amount_cents: amount, force: scenario.force });
+    const paid = await pay();
+    if (paid.status >= 400) throw new Error((paid.data && paid.data.error) || "The payment could not be started.");
+    youSteps.push("The gateway took the payment.");
+    if (scenario.doubleTap) {
+      const again = await pay();
+      youSteps.push(again.data && again.data.already_paid
+        ? "The second payment request was refused: this order is already paid."
+        : "The second payment request was sent.");
+    }
+    const cb = paid.data && paid.data.callback;
+    if (cb === "duplicated") youSteps.push("The gateway sent its confirmation twice.");
+    if (cb === "lost") youSteps.push("The gateway's confirmation was lost on the way.");
+    if (cb === "delayed") youSteps.push("The gateway's confirmation was held back.");
+  } catch (e) {
+    showError(e.message || "Something went wrong.");
+    await resetChaos();
+    $("pay").disabled = false;
+    return;
+  }
+  poll(orderId, youSteps, myRun, Date.now());
+}
+
+async function resume() {
+  const m = /^#(web-[0-9a-f]{16})$/.exec(location.hash);
+  if (!m) return;
+  const orderId = m[1];
+  let res = null;
+  try { res = await api("GET", "/orders/" + orderId); } catch (e) { /* ignore */ }
+  if (!res || res.status !== 200) return;
+  $("live").hidden = false;
+  $("orderline").textContent = "Order " + orderId;
+  $("explain").textContent = "You reloaded the page, so this shows what has happened to this order so far.";
+  $("pay").disabled = true;
+  poll(orderId, [], ++run, Date.now());
+}
+
+buildScenarios();
+$("pay").addEventListener("click", start);
+window.addEventListener("pagehide", resetChaos);
+resume();
+</script>
+</body>
+</html>
