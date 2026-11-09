@@ -120,6 +120,8 @@ The tests run locally against a fake AWS, so they need no account and cost nothi
 - a supplier that never issued a token (exactly one refund)
 - the same delivery message being processed twice
 - invalid state changes being refused
+- callbacks with a bad signature or the wrong amount being rejected
+- an unreachable or confusing supplier never causing a refund (the system waits until it knows what happened)
 
 Run them with `python -m pytest tests/ -q`. I also ran scenarios against the deployed system, shown in the demo video.
 
