@@ -6,3 +6,4 @@ key.json
 build/
 __pycache__/
 *.pyc
+key*.json
